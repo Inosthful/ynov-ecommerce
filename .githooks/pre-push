@@ -1,35 +1,50 @@
 #!/bin/bash
-# Intercepte les push directs sur main et crée une PR à la place
+[ -n "$INTERNAL_PUSH" ] && exit 0
 
 REMOTE="$1"
+FEATURE_BRANCH=""
 
 while read local_ref local_sha remote_ref remote_sha; do
-  if [ "$remote_ref" = "refs/heads/main" ]; then
-    BRANCH="auto/$(date +%Y%m%d-%H%M%S)"
+  BRANCH="${remote_ref#refs/heads/}"
 
+  if [ "$remote_ref" = "refs/heads/main" ]; then
+    AUTO_BRANCH="auto/$(date +%Y%m%d-%H%M%S)"
     echo ""
     echo "⛔  Push direct sur main bloqué."
-    echo "➡️   Création de la branche '$BRANCH'..."
+    echo "➡️   Création de la branche '$AUTO_BRANCH'..."
 
-    git push "$REMOTE" "HEAD:refs/heads/$BRANCH" || {
-      echo "❌ Échec du push vers '$BRANCH'."
-      exit 1
-    }
+    INTERNAL_PUSH=1 git push "$REMOTE" "HEAD:refs/heads/$AUTO_BRANCH" || exit 1
 
     echo "🔀  Ouverture de la PR vers main..."
     gh pr create \
       --base main \
-      --head "$BRANCH" \
-      --title "feat: $BRANCH" \
-      --body "PR créée automatiquement — push direct sur main intercepté." || {
-      echo "❌ Échec de la création de la PR (gh CLI installé ?)."
-      exit 1
-    }
+      --head "$AUTO_BRANCH" \
+      --title "feat: $AUTO_BRANCH" \
+      --body "PR créée automatiquement — push direct sur main intercepté." || exit 1
 
-    echo ""
-    echo "✅  PR créée pour la branche '$BRANCH'. Push direct annulé."
+    echo "✅  PR créée pour '$AUTO_BRANCH'. Push direct annulé."
     exit 1
+  else
+    FEATURE_BRANCH="$BRANCH"
   fi
 done
+
+if [ -n "$FEATURE_BRANCH" ]; then
+  (
+    sleep 4
+    EXISTING=$(gh pr list --head "$FEATURE_BRANCH" --base main --json number --jq '.[0].number' 2>/dev/null)
+    if [ -n "$EXISTING" ]; then
+      echo "ℹ️   PR #$EXISTING déjà ouverte pour '$FEATURE_BRANCH' → main."
+    else
+      echo "🔀  Ouverture de la PR '$FEATURE_BRANCH' → main..."
+      gh pr create \
+        --base main \
+        --head "$FEATURE_BRANCH" \
+        --title "feat: $FEATURE_BRANCH" \
+        --body "PR créée automatiquement pour la branche \`$FEATURE_BRANCH\`." && \
+      echo "✅  PR créée pour '$FEATURE_BRANCH' → main."
+    fi
+  ) &
+fi
 
 exit 0
