@@ -1,0 +1,35 @@
+#!/bin/bash
+# Intercepte les push directs sur main et crée une PR à la place
+
+REMOTE="$1"
+
+while read local_ref local_sha remote_ref remote_sha; do
+  if [ "$remote_ref" = "refs/heads/main" ]; then
+    BRANCH="auto/$(date +%Y%m%d-%H%M%S)"
+
+    echo ""
+    echo "⛔  Push direct sur main bloqué."
+    echo "➡️   Création de la branche '$BRANCH'..."
+
+    git push "$REMOTE" "HEAD:refs/heads/$BRANCH" || {
+      echo "❌ Échec du push vers '$BRANCH'."
+      exit 1
+    }
+
+    echo "🔀  Ouverture de la PR vers main..."
+    gh pr create \
+      --base main \
+      --head "$BRANCH" \
+      --title "feat: $BRANCH" \
+      --body "PR créée automatiquement — push direct sur main intercepté." || {
+      echo "❌ Échec de la création de la PR (gh CLI installé ?)."
+      exit 1
+    }
+
+    echo ""
+    echo "✅  PR créée pour la branche '$BRANCH'. Push direct annulé."
+    exit 1
+  fi
+done
+
+exit 0
