@@ -1,34 +1,55 @@
 #!/bin/bash
-# Intercepte les push directs sur main et crée une PR à la place
-
 REMOTE="$1"
 
 while read local_ref local_sha remote_ref remote_sha; do
-  if [ "$remote_ref" = "refs/heads/main" ]; then
-    BRANCH="auto/$(date +%Y%m%d-%H%M%S)"
+  BRANCH="${remote_ref#refs/heads/}"
 
+  if [ "$remote_ref" = "refs/heads/main" ]; then
+    AUTO_BRANCH="auto/$(date +%Y%m%d-%H%M%S)"
     echo ""
     echo "⛔  Push direct sur main bloqué."
-    echo "➡️   Création de la branche '$BRANCH'..."
+    echo "➡️   Création de la branche '$AUTO_BRANCH'..."
 
-    git push "$REMOTE" "HEAD:refs/heads/$BRANCH" || {
-      echo "❌ Échec du push vers '$BRANCH'."
+    git push "$REMOTE" "HEAD:refs/heads/$AUTO_BRANCH" || {
+      echo "❌ Échec du push vers '$AUTO_BRANCH'."
       exit 1
     }
 
     echo "🔀  Ouverture de la PR vers main..."
     gh pr create \
       --base main \
-      --head "$BRANCH" \
-      --title "feat: $BRANCH" \
+      --head "$AUTO_BRANCH" \
+      --title "feat: $AUTO_BRANCH" \
       --body "PR créée automatiquement — push direct sur main intercepté." || {
-      echo "❌ Échec de la création de la PR (gh CLI installé ?)."
+      echo "❌ Échec de la création de la PR."
       exit 1
     }
 
-    echo ""
-    echo "✅  PR créée pour la branche '$BRANCH'. Push direct annulé."
+    echo "✅  PR créée pour '$AUTO_BRANCH'. Push direct annulé."
     exit 1
+
+  else
+    echo "➡️   Push de la branche '$BRANCH'..."
+    git push "$REMOTE" "$local_ref:$remote_ref" || {
+      echo "❌ Échec du push de '$BRANCH'."
+      exit 1
+    }
+
+    EXISTING=$(gh pr list --head "$BRANCH" --base main --json number --jq '.[0].number' 2>/dev/null)
+    if [ -n "$EXISTING" ]; then
+      echo "ℹ️   PR #$EXISTING déjà ouverte pour '$BRANCH' → main."
+    else
+      echo "🔀  Ouverture de la PR '$BRANCH' → main..."
+      gh pr create \
+        --base main \
+        --head "$BRANCH" \
+        --title "feat: $BRANCH" \
+        --body "PR créée automatiquement pour la branche \`$BRANCH\`." || {
+        echo "❌ Échec de la création de la PR."
+        exit 1
+      }
+      echo "✅  PR créée pour '$BRANCH' → main."
+    fi
   fi
 done
 
