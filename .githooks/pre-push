@@ -1,4 +1,7 @@
 #!/bin/bash
+# Évite la récursion infinie quand le hook fait lui-même un git push
+[ -n "$INTERNAL_PUSH" ] && exit 0
+
 REMOTE="$1"
 
 while read local_ref local_sha remote_ref remote_sha; do
@@ -10,7 +13,7 @@ while read local_ref local_sha remote_ref remote_sha; do
     echo "⛔  Push direct sur main bloqué."
     echo "➡️   Création de la branche '$AUTO_BRANCH'..."
 
-    git push "$REMOTE" "HEAD:refs/heads/$AUTO_BRANCH" || {
+    INTERNAL_PUSH=1 git push "$REMOTE" "HEAD:refs/heads/$AUTO_BRANCH" || {
       echo "❌ Échec du push vers '$AUTO_BRANCH'."
       exit 1
     }
@@ -30,7 +33,7 @@ while read local_ref local_sha remote_ref remote_sha; do
 
   else
     echo "➡️   Push de la branche '$BRANCH'..."
-    git push "$REMOTE" "$local_ref:$remote_ref" || {
+    INTERNAL_PUSH=1 git push "$REMOTE" "$local_ref:$remote_ref" || {
       echo "❌ Échec du push de '$BRANCH'."
       exit 1
     }
