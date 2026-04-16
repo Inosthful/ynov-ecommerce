@@ -1,6 +1,9 @@
 const express = require('express');
 const router = express.Router();
 const orders = require('../data/orders');
+const products = require('../data/products');
+
+const ENABLE_STRICT_INVENTORY = process.env.ENABLE_STRICT_INVENTORY === 'true';
 
 // GET /api/orders
 router.get('/', (req, res) => {
@@ -22,6 +25,12 @@ router.post('/', (req, res) => {
   const { userId, productIds } = req.body;
   if (!userId || !productIds || !Array.isArray(productIds)) {
     return res.status(400).json({ error: 'userId and productIds[] are required' });
+  }
+  if (ENABLE_STRICT_INVENTORY) {
+    const unknown = productIds.filter(id => !products.find(p => p.id === id));
+    if (unknown.length > 0) {
+      return res.status(422).json({ error: 'Some products are unavailable', ids: unknown });
+    }
   }
   const newOrder = {
     id: orders.length + 1,
