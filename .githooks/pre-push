@@ -1,5 +1,7 @@
 #!/bin/bash
 [ -n "$INTERNAL_PUSH" ] && exit 0
+# En environnement CI (GitHub Actions etc.), on ne bloque rien
+[ -n "$CI" ] && exit 0
 
 REMOTE="$1"
 FEATURE_BRANCH=""
