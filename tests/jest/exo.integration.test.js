@@ -1,8 +1,5 @@
-const { describe, it, beforeEach } = require('node:test');
-const assert = require('node:assert/strict');
-const { saveOrder, db } = require('../exo');
+const { saveOrder, db } = require('../../exo');
 
-// DB en mémoire réaliste : stocke et retrouve vraiment les données
 const inMemoryDb = {
   _products: [
     { id: 1, name: 'Clavier', price: 79.90 },
@@ -22,7 +19,6 @@ const inMemoryDb = {
   },
 };
 
-// ── saveOrder (db en mémoire) ─────────────────────────────────
 describe('[INTÉGRATION] saveOrder', () => {
 
   beforeEach(() => {
@@ -33,22 +29,20 @@ describe('[INTÉGRATION] saveOrder', () => {
 
   it('crée une commande avec le bon prix depuis la DB', async () => {
     const result = await saveOrder({ productId: 1, userId: 10 });
-    assert.equal(result.price, 79.90);
-    assert.equal(result.userId, 10);
-    assert.equal(result.productId, 1);
+    expect(result.price).toBe(79.90);
+    expect(result.userId).toBe(10);
+    expect(result.productId).toBe(1);
   });
 
   it('persiste la commande dans la DB en mémoire', async () => {
     await saveOrder({ productId: 2, userId: 5 });
-    assert.equal(inMemoryDb._orders.length, 1);
-    assert.equal(inMemoryDb._orders[0].price, 29.90);
+    expect(inMemoryDb._orders).toHaveLength(1);
+    expect(inMemoryDb._orders[0].price).toBe(29.90);
   });
 
   it('rejette si le produit est absent de la DB', async () => {
-    await assert.rejects(
-      () => saveOrder({ productId: 99, userId: 1 }),
-      { message: 'Product not found' }
-    );
+    await expect(saveOrder({ productId: 99, userId: 1 }))
+      .rejects.toThrow('Product not found');
   });
 
 });
